@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "incident_id": "DEMO-NET-101",
+  "device": "edge-lab-01",
+  "captured_at": "2026-09-22T14:00:00Z",
+  "reported_impact": "Synthetic customer reports that one edge device stopped uploading event summaries.",
+  "checks": {
+    "dns": {"status": "pass", "observed_at": "2026-09-22T13:59:00Z", "query": "ingest.example.com", "answers": ["203.0.113.20"], "detail": "A record returned by the configured resolver."},
+    "gateway": {"status": "fail", "observed_at": "2026-09-22T13:59:10Z", "target": "192.0.2.1", "detail": "ICMP probe did not receive a reply; forwarding has not been independently checked."},
+    "tcp": {"status": "fail", "observed_at": "2026-09-22T13:59:20Z", "target": "203.0.113.20", "port": 443, "detail": "Direct-IP TCP connection timed out."},
+    "service": {"status": "running", "observed_at": "2026-09-22T13:59:30Z", "detail": "edge-agent process is active; this does not prove successful uploads."},
+    "disk": {"status": "collected", "observed_at": "2026-09-22T13:59:35Z", "mount": "/var/lib/edge-demo", "used_percent": 41},
+    "logs": {"status": "collected", "observed_at": "2026-09-22T13:59:45Z", "events": [{"at": "2026-09-22T13:58:00Z", "level": "error", "signal": "connect_timeout", "message": "Synthetic upload attempt to ingest.example.com timed out."}]}
+  }
+}

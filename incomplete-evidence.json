@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "incident_id": "DEMO-UNK-303",
+  "device": "edge-lab-03",
+  "captured_at": "2026-09-22T16:00:00Z",
+  "reported_impact": "Synthetic customer reports an intermittent offline indicator; no reproduction steps are available.",
+  "checks": {
+    "dns": {"status": "unknown", "detail": "A lookup was attempted, but its result was not captured."},
+    "gateway": {"status": "not_collected", "detail": "No gateway observation was supplied."},
+    "service": {"status": "running", "observed_at": "2026-09-22T14:00:00Z", "detail": "This observation predates the reported incident window."},
+    "logs": {"status": "unknown", "detail": "The user mentioned errors but did not supply their text or timestamps."}
+  }
+}

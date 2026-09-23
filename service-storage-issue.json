@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "incident_id": "DEMO-SVC-202",
+  "device": "edge-lab-02",
+  "captured_at": "2026-09-22T15:00:00Z",
+  "reported_impact": "Synthetic customer reports missing event summaries after the local agent stopped.",
+  "checks": {
+    "dns": {"status": "pass", "observed_at": "2026-09-22T14:58:00Z", "query": "ingest.example.com", "answers": ["203.0.113.20"]},
+    "gateway": {"status": "pass", "observed_at": "2026-09-22T14:58:10Z", "target": "192.0.2.1"},
+    "tcp": {"status": "pass", "observed_at": "2026-09-22T14:58:20Z", "target": "203.0.113.20", "port": 443, "detail": "TCP handshake succeeded; TLS and application authentication were not tested."},
+    "service": {"status": "failed", "observed_at": "2026-09-22T14:59:00Z", "detail": "edge-agent is in failed state."},
+    "disk": {"status": "collected", "observed_at": "2026-09-22T14:59:10Z", "mount": "/var/lib/edge-demo", "used_percent": 99},
+    "logs": {"status": "collected", "observed_at": "2026-09-22T14:59:30Z", "events": [
+      {"at": "2026-09-22T14:57:00Z", "level": "error", "signal": "no_space", "message": "Synthetic agent: no space left on device while writing /var/lib/edge-demo/queue.db."},
+      {"at": "2026-09-22T14:57:01Z", "level": "error", "signal": "service_exit", "message": "Synthetic edge-agent exited with code 1."}
+    ]}
+  }
+}

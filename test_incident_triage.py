@@ -43,6 +43,18 @@ class IncidentTests(unittest.TestCase):
         self.bundle['alerts'][1]['observed_at'] = '2026-01-10T07:01:00-05:00'
         self.assertEqual(1, len(app.correlate(self.bundle)['incidents']))
 
+    def test_projection_keeps_relative_sequence_and_device_spread(self):
+        self.bundle['alerts'][1]['device'] = 'demo-edge-02'
+        self.bundle['alerts'][1]['observed_at'] = '2026-01-10T07:01:00-05:00'
+        projected, = app.projection(app.correlate(self.bundle))
+        self.assertEqual(2, projected['device_count'])
+        self.assertEqual([0, 60], [e['t_plus_seconds'] for e in projected['events']])
+        self.assertEqual(['device-1', 'device-2'], [e['device'] for e in projected['events']])
+        self.assertEqual(['none', 'outage'], [e['impact'] for e in projected['events']])
+        serialized = json.dumps(projected)
+        for private in ('demo-', '2026-', 'observed_at', 'site'):
+            self.assertNotIn(private, serialized)
+
     def test_reject_invalid_and_non_synthetic_input(self):
         for field, value in [('synthetic', False), ('schema_version', True), ('alerts', [])]:
             bundle = copy.deepcopy(self.bundle)
@@ -97,6 +109,10 @@ class IncidentTests(unittest.TestCase):
         for forbidden in ('demo-branch', 'demo-edge', 'observed_at', 'test-secret'):
             self.assertNotIn(forbidden, payload)
         self.assertNotIn('tools', json.loads(payload))
+        sent = json.loads(json.loads(payload)['messages'][0]['content'])
+        self.assertEqual(['t_plus_seconds', 'device', 'signal', 'impact'], list(sent[0]['events'][0]))
+        self.assertEqual(0, sent[0]['events'][0]['t_plus_seconds'])
+        self.assertTrue(all(e['device'].startswith('device-') for i in sent for e in i['events']))
         self.assertEqual(30, send.call_args.kwargs['timeout'])
 
     @patch('incident_triage.urllib.request.urlopen')

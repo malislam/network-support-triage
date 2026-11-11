@@ -43,6 +43,10 @@ flowchart LR
 This separate command correlates **synthetic alerts only**. It does not ingest TAC
 files, production logs or the original support bundles. No extra packages are required.
 Start with the [sample incident report](examples/incident-report.md).
+Compare it with the [live Claude draft and editorial review](examples/incident-report-claude.md)
+and its [unaltered report JSON](examples/incident-report-claude.json). This example
+is pending human approval: the review identifies unsupported timing mechanisms
+and historical-check wording rather than treating a successful API call as validation.
 
 ```sh
 python incident_triage.py run examples/alerts/routing-failure.json --output reports/routing-demo
@@ -106,10 +110,15 @@ python incident_triage.py run examples/alerts/wan-congestion.json --output repor
 
 This makes one potentially billable request to the
 [Claude Messages API](https://platform.claude.com/docs/en/api/messages/create).
-The provider receives only an allowlisted aggregate projection: numbered incident,
-family, severity, signal enums and alert count. Site/device/alert identifiers,
-timestamps and raw input are omitted. Free-text logs are not accepted at all.
-This data minimization avoids relying on regex redaction of arbitrary logs.
+The provider receives only an allowlisted, de-identified projection: numbered
+incident, family, severity, alert and device counts, the deterministic runbook step,
+and the ordered event sequence as seconds since the incident's first alert, a
+per-incident device ordinal (`device-1`, `device-2`), signal and impact.
+Site/device/alert identifiers, real timestamps and raw input are omitted. Free-text
+logs are not accepted at all. This data minimization avoids relying on regex
+redaction of arbitrary logs. The prompt asks for four sections per incident
+(what the evidence shows, ranked unconfirmed hypotheses, read-only checks, and
+post-mortem notes) and forbids changing severity or claiming resolution.
 There are no model tools. Responses are bounded, escaped in Markdown and labeled
 as an untrusted draft; humans must check them for unsupported claims.
 
@@ -118,8 +127,10 @@ timeouts, API errors, invalid responses or truncated output retain the offline
 report and record a sanitized failure in the report/audit. This fallback exits
 successfully because deterministic analysis completed; check `summary.provider`
 and `summary.failure` to see whether AI contributed. The request timeout is 30
-seconds, output is capped at 800 tokens, and there are no automatic retries.
+seconds, output is capped at 1,500 tokens, and there are no automatic retries.
 Tests mock the API; they do not demonstrate a successful live provider call.
+The checked-in Claude example was separately generated through a live API call
+using `claude-haiku-4-5-20251001`; its raw output is preserved with review notes.
 
 ### Review and audit files
 

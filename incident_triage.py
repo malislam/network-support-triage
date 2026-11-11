@@ -78,16 +78,56 @@ def correlate(bundle):
             'summary': {'provider': 'offline', 'text': 'Review evidence, validate impact and approve or reject the proposed investigation. No changes executed.'}}
 
 
+def projection(report):
+    """Allowlisted, de-identified view of each incident for the model.
+
+    Includes the ordered event sequence (seconds since the incident's first alert,
+    a per-incident device ordinal, signal and impact) so the draft can reason about
+    order and spread, but never input identifiers, timestamps, free text or keys.
+    """
+    items = []
+    for number, item in enumerate(report['incidents'], start=1):
+        start = timestamp(item['timeline'][0]['observed_at'], 'time')
+        ordinals = {}
+        events = []
+        for alert in item['timeline']:
+            device = ordinals.setdefault(alert['device'], f'device-{len(ordinals) + 1}')
+            offset = int((timestamp(alert['observed_at'], 'time') - start).total_seconds())
+            events.append({'t_plus_seconds': offset, 'device': device,
+                           'signal': alert['signal'], 'impact': alert['impact']})
+        items.append({'incident': number, 'family': item['family'], 'severity': item['severity'],
+                      'alert_count': len(item['timeline']), 'device_count': len(ordinals),
+                      'events': events, 'deterministic_runbook': item['suggested_runbook']})
+    return items
+
+
+SYSTEM_PROMPT = (
+    'You are drafting notes for a network operations engineer reviewing synthetic incident evidence. '
+    'Severity, grouping and escalation are already decided and are not yours to change. Root cause is unconfirmed. '
+    'For each incident write four short sections: "What the evidence shows" (order and spread of events), '
+    '"Hypotheses" (at most two, each marked unconfirmed; leave unranked unless evidence distinguishes them), '
+    '"Read-only checks" (what to look at to confirm or rule out each hypothesis; no configuration changes), '
+    'and "Post-mortem notes" (a timeline sketch and open questions). Do not invent facts beyond the events given, '
+    'do not claim resolution, and say plainly when the evidence is too thin. '
+    'Events are observations, not exact onset times. Impact none means no impact was reported in that event, not proof of health. '
+    'A signal is an alert: never say a route_change event triggered no alert. '
+    'Do not infer TCP retry exhaustion, protocol timers, BGP/OSPF use, actual configuration edits, '
+    'user-visible scope, or intermediate events from the time gap. '
+    'Keep the timeline strictly to supplied events; list mechanisms only as unsupported possibilities, '
+    'and do not rank hypotheses by likelihood when the evidence cannot distinguish them. '
+    'Do not imply historical measurements can be collected now; distinguish existing historical records '
+    'from current read-only checks. '
+    'For a route_change and tcp_failure pair, the only supported hypotheses are that the events may be related '
+    'or may be independent; do not expand these into invented protocol-specific mechanisms. '
+    'Only report the two recorded observations in the timeline. Never add a row for the interval between them. '
+    'Reported outage impact does not establish user-facing, widespread, or all-flow failure. '
+    'Keep the entire response under 350 words. Human approval is required. You have no tools.')
+
+
 def claude_summary(report, model, api_key):
     require(bool(api_key) and bool(model), 'Claude requires ANTHROPIC_API_KEY and --model')
-    # Allowlisted aggregate projection: no input identifiers, timestamps, free text,
-    # raw logs or keys can enter the provider prompt.
-    projection = [{'incident': i + 1, 'family': item['family'], 'severity': item['severity'],
-                   'signals': item['signals'], 'alert_count': len(item['timeline'])}
-                  for i, item in enumerate(report['incidents'])]
-    body = {'model': model, 'max_tokens': 800,
-            'system': 'Summarize synthetic network evidence and suggest read-only investigation steps. Root cause is unconfirmed. Do not change severity or claim resolution. Human approval is required. You have no tools.',
-            'messages': [{'role': 'user', 'content': json.dumps(projection)}]}
+    body = {'model': model, 'max_tokens': 1500, 'system': SYSTEM_PROMPT,
+            'messages': [{'role': 'user', 'content': json.dumps(projection(report))}]}
     request = urllib.request.Request('https://api.anthropic.com/v1/messages',
               data=canonical(body), headers={'content-type': 'application/json',
               'x-api-key': api_key, 'anthropic-version': '2023-06-01'}, method='POST')
@@ -107,7 +147,8 @@ def claude_summary(report, model, api_key):
 
 def render(report):
     lines = ['# Synthetic incident triage', '', '**Human approval: pending. No changes executed.**', '',
-             '## Advisory summary (untrusted draft)', '', md(report['summary']['text'])]
+             '## Advisory summary (untrusted draft)', '',
+             '\n'.join(md(line) for line in report['summary']['text'].splitlines())]
     for item in report['incidents']:
         lines += ['', f"## {item['incident_id']} — {item['severity']}", '',
                   f"Site: {item['site']}; family: {item['family']}", '',

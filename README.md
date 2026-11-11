@@ -1,6 +1,6 @@
 # Network support triage
 
-An offline Python tool for reviewing an edge-device support bundle and drafting a useful escalation. It separates observed failures from missing evidence instead of treating every offline device as a network outage.
+Python tools for evidence-led network support: the original offline support-bundle analyzer and a synthetic incident-alert add-on with optional Claude summaries. Both separate observations from unconfirmed root causes.
 
 **Start with [the example report](example-report.md)**, then run the same case locally. Python 3.10+ is the only dependency; no API keys, packages, or hardware are needed.
 
@@ -38,7 +38,108 @@ flowchart LR
 | [Service and storage](service-storage-issue.json) | A failed service, high disk use, and a recent write error support a hypothesis, not a confirmed root cause |
 | [Incomplete evidence](incomplete-evidence.json) | Missing checks and an old service observation remain unknown |
 
-## Input contract
+## AI-assisted incident triage add-on
+
+This separate command correlates **synthetic alerts only**. It does not ingest TAC
+files, production logs or the original support bundles. No extra packages are required.
+Start with the [sample incident report](examples/incident-report.md).
+
+```sh
+python incident_triage.py run examples/alerts/routing-failure.json --output reports/routing-demo
+python incident_triage.py review reports/routing-demo --decision approve --reviewer "Demo reviewer" --reason "Reviewed evidence; approve the proposed investigation"
+python -m unittest discover -v
+```
+
+Read `report.md` and `report.json` before reviewing. Use `--decision reject` to record
+a rejection. Approval records a human decision about the draft investigation; it
+does not execute, schedule or authorize device changes. There is no command runner,
+device connection, ticket creation or automatic remediation in this project.
+
+```mermaid
+flowchart LR
+  A[Synthetic JSON alerts] --> B[Validate and sort]
+  B --> C[Deterministic correlation and severity]
+  C --> D[Offline report]
+  C --> E[Optional Claude aggregate summary]
+  E --> D
+  D --> F[Human approves or rejects]
+  F --> G[Local review record and audit trail]
+```
+
+### Synthetic scenarios and policy
+
+| Fixture under `examples/alerts/` | Evidence | Expected severity |
+| --- | --- | --- |
+| `routing-failure.json` | Route change and TCP failure | SEV1 |
+| `wan-congestion.json` | High utilization, loss and latency | SEV2 |
+| `ha-failover.json` | HA event and application errors | SEV2 |
+| `recurring-hardware.json` | Three power-supply alarms | SEV2 |
+
+The strict JSON contract is `schema_version: 1`, `synthetic: true`, and 1–500
+`alerts`. Each alert has only `id`, `site`, `device`, `observed_at`, `signal`, and
+`impact`. IDs/site/device must match `demo-[a-z0-9-]+` (maximum 60 characters),
+IDs must be unique, and timestamps must include a timezone. Signals are the eight
+explicit values in `SIGNALS` in [incident_triage.py](incident_triage.py); impact is
+`none`, `degraded`, or `outage`. Extra fields, duplicate keys, nonfinite numbers
+and inputs over 1 MiB are rejected. Fictional labeling is an input contract, not
+a detector that can prove data provenance; never relabel real data as synthetic.
+
+Correlation uses site + signal family + fixed five-minute UTC bucket. Different
+devices at the same site can correlate; adjacent buckets remain separate even
+when alerts are seconds apart. Input order does not affect the result. Families
+are routing, capacity, availability and hardware. Grouping is a heuristic for
+investigation, not proof of a shared cause. Severity uses the highest reported
+impact: outage → SEV1, degraded → SEV2, none → SEV3. Three or more hardware
+alarms in a bucket raise SEV3 to SEV2 for problem review. These are demonstration
+rules, not a production SLA. The model cannot set severity, correlation,
+escalation, approval state or the deterministic suggested runbook.
+
+### Optional Claude summary
+
+Set `ANTHROPIC_API_KEY` in your local environment and select a model ID available
+to your account. Never put the key in a command argument, fixture or committed file.
+Then opt in explicitly:
+
+```sh
+python incident_triage.py run examples/alerts/wan-congestion.json --output reports/claude-demo --claude --model YOUR_MODEL_ID
+```
+
+This makes one potentially billable request to the
+[Claude Messages API](https://platform.claude.com/docs/en/api/messages/create).
+The provider receives only an allowlisted aggregate projection: numbered incident,
+family, severity, signal enums and alert count. Site/device/alert identifiers,
+timestamps and raw input are omitted. Free-text logs are not accepted at all.
+This data minimization avoids relying on regex redaction of arbitrary logs.
+There are no model tools. Responses are bounded, escaped in Markdown and labeled
+as an untrusted draft; humans must check them for unsupported claims.
+
+Without `--claude`, no API call occurs even if a key is set. Missing configuration,
+timeouts, API errors, invalid responses or truncated output retain the offline
+report and record a sanitized failure in the report/audit. This fallback exits
+successfully because deterministic analysis completed; check `summary.provider`
+and `summary.failure` to see whether AI contributed. The request timeout is 30
+seconds, output is capped at 800 tokens, and there are no automatic retries.
+Tests mock the API; they do not demonstrate a successful live provider call.
+
+### Review and audit files
+
+Every run requires a new output directory and writes `report.json`, `report.md`,
+and `audit.jsonl`. The creation event records UTC time, SHA-256 digests of canonical
+input/report JSON, provider, model and any sanitized provider failure. Review
+verifies the report digest and writes an exclusive `review.json` plus an audit
+event with reviewer, reason and decision. A second review or changed report is
+rejected; run a new report for revisions. The report remains the original pending
+snapshot, while `review.json` holds the final decision. Review the JSON as the
+authoritative evidence if the Markdown file has been edited.
+
+Audit files are local demo records, not authenticated identities or tamper-proof
+storage. Someone who can rewrite both report and audit can replace the digests.
+Writes are not a multi-file database transaction: a disk failure can leave an
+incomplete output directory. Preserve it for inspection and run again into a new
+directory; do not use partial artifacts as an approval. Keep generated reports
+and local credentials out of version control (`reports/` and `.env` are ignored).
+
+## Original support-bundle input contract
 
 Use one of the three JSON files as a starting point. `schema_version` is integer `1`; `incident_id`, `device`, `reported_impact`, and timezone-aware `captured_at` are required. Checks are `dns`, `gateway`, `tcp`, `service`, `disk`, and `logs`. Uncollected checks may be omitted. Observed checks require `observed_at` no later than the bundle timestamp.
 

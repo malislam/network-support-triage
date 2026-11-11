@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "synthetic": true,
+  "alerts": [
+    {
+      "id": "demo-alert-1",
+      "site": "demo-branch-01",
+      "device": "demo-edge-01",
+      "observed_at": "2026-01-10T12:00:00Z",
+      "signal": "ha_failover",
+      "impact": "none"
+    },
+    {
+      "id": "demo-alert-2",
+      "site": "demo-branch-01",
+      "device": "demo-edge-01",
+      "observed_at": "2026-01-10T12:01:00Z",
+      "signal": "application_errors",
+      "impact": "degraded"
+    }
+  ]
+}

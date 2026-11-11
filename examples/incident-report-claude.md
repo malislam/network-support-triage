@@ -1,16 +1,17 @@
 # Live Claude example: editorial review required
 
-This is an actual Claude API response to the same synthetic routing fixture as the offline example. Model: `claude-haiku-4-5-20251001`. The draft below is unaltered; these editorial notes were added afterward. No human approval or device action is claimed.
+This is an actual Claude API response to the synthetic routing fixture, regenerated once after removing case-specific prompt constraints. Model: `claude-haiku-4-5-20251001`. The draft wording below is unaltered and displayed as plain text (trailing whitespace normalized); these editorial notes were added afterward. No human approval or device action is claimed.
 
 ## Editorial review
 
-- Supported observations: one route-change alert, then one TCP-failure alert 60 seconds later on the same fictional device. The second alert reports outage impact. Cause, actual onset time and affected scope remain unknown.
-- The hypotheses introduce TCP timers, retransmission exhaustion and possible intermediate faults. These are unsupported possibilities, not findings; the 60-second gap provides no evidence for those mechanisms. Do not carry them into an incident conclusion.
-- The wording about the gap precluding confirmation is imprecise: the limitation is insufficient evidence, not the existence of a gap. Temporal order alone cannot prove causation.
-- Before/after routing tables, path tests and device-health data can be compared only if historical records exist. Current probes cannot reconstruct past conditions. CPU or memory checks alone cannot rule out a historical fault.
-- The model's final sentence adds approval before escalation. It does not override the deterministic escalation field or a real incident procedure. This demo records review of a proposed investigation and executes nothing.
+- Supported observations: one route-change alert, then one TCP-failure alert 60 seconds later on the same fictional device. The second alert reports outage impact. Cause, actual onset time and affected scope remain unknown. No reported impact in the first alert is not proof of health.
+- The title and evidence section infer delayed, user-visible impact and route modification. The supplied signals establish neither exact onset nor an actual configuration edit or user scope. The timestamps show observation order only.
+- The hypotheses infer convergence, next-hop changes and TCP retransmission/timeout behavior. Those mechanisms are unsupported possibilities, not findings. The 60-second observation gap does not distinguish them.
+- The timeline inserts a silent interval with convergence, loss or degradation occurring. No observations support that interval; retain only the two supplied events in an evidence timeline.
+- The suggested prefix and next-hop details are absent from this fixture. They would require additional evidence. Historical interface logs, metrics and counters can be reviewed only if retained; current checks cannot reconstruct past conditions, and comparisons should use the intended state for the relevant time.
+- The response has 363 whitespace-delimited words; the prompt's under-350-word instruction is advisory and is not enforced by the application.
 
-Disposition: pending human review; not approved for operational use. Retain the two observed events, validate impact, and collect available route/path evidence before accepting any hypothesis.
+Disposition: pending human review; not approved for operational use. Validate impact and collect available routing/path evidence before accepting a hypothesis. The model draft does not override deterministic severity, grouping, escalation or runbook fields.
 
 ## Original generated report
 
@@ -20,48 +21,45 @@ Disposition: pending human review; not approved for operational use. Retain the 
 
 ## Advisory summary (untrusted draft)
 
-\# Incident 1 Analysis
+```text
+# Incident 1: Routing Anomaly with Delayed TCP Impact
 
-\#\# What the evidence shows
+## What the evidence shows
 
-\- \*\*T\+0s\*\*: Route change detected on device\-1; no impact reported at observation time\.
-\- \*\*T\+60s\*\*: TCP failure observed on device\-1 with outage reported\.
+At t+0s, device-1 observes a route change with no reported impact. Sixty seconds later, device-1 signals TCP failures associated with an outage. The 60-second delay between route modification and user-visible TCP breakdown suggests either transient traffic loss during convergence, or a cascading effect where the new route state gradually degrades reachability or introduces latency/packet loss that TCP eventually cannot tolerate.
 
-Both signals originated from the same device within a 60\-second window\. The route\_change signal triggered an alert; the subsequent tcp\_failure also triggered an alert\. The temporal proximity suggests possible association, but the gap precludes confirmation of causal sequence from the events alone\.
+## Hypotheses
 
-\#\# Hypotheses
+**H1 (unconfirmed): Route withdrawn or repointed to unreachable/lossy path**
+The route_change at t+0s altered next-hop resolution or path selection. The destination may have become unreachable, packet-loss-prone, or latency-bound over the new path. TCP sessions accumulate retransmission timeouts during this interval until application-layer timeouts or connection resets occur.
 
-\*\*Hypothesis A \(unconfirmed\):\*\* The route change at T\+0s altered forwarding behavior, leading to TCP session failures by T\+60s\. The interval may reflect TCP connection\-establishment timeouts, retransmission exhaustion, or delayed detection of path unavailability\.
+**H2 (unconfirmed): Route change triggered by upstream convergence event**
+An external topology change (link failure, BGP withdrawal, OSPF reconvergence) caused device-1's route table to update. The 60-second gap may reflect routing protocol convergence delay or gradual session timeout exhaustion rather than a direct causality between route and TCP failure.
 
-\*\*Hypothesis B \(unconfirmed\):\*\* The route change and TCP failure are independent events; the route change may be unrelated to connectivity loss, or the TCP failure may stem from a separate fault \(link down, neighbor loss, congestion\) occurring between T\+0s and T\+60s\.
+## Read-only checks
 
-\#\# Read\-only checks
+- Compare forwarding table snapshot (if available from t+0s) against current intended state; identify which route(s) changed and their new next-hops.
+- Retrieve prefix and nexthop specifics from the route_change alert payload to confirm what destination(s) were affected.
+- Check device-1's interface state and neighbor adjacency logs around t+0s for link or peer flaps.
+- Review packet loss, latency, or jitter metrics on device-1's egress interfaces during [t+0s, t+60s].
+- Inspect TCP/IP stack counters on device-1 (retransmits, connection resets, timeouts) to correlate with the outage window.
+- If topology maps exist, verify whether the new next-hop for the affected prefix is actually reachable from device-1.
 
-1\. \*\*Route comparison\*\*: Retrieve the route table state at T\+0s and T\+60s; compare against the intended routing policy to identify what changed and whether the change aligned with configuration intent\.
+## Post-mortem notes
 
-2\. \*\*Affected prefixes &amp; destinations\*\*: Determine which routes changed \(destination CIDR, next\-hop, metric, path\) and correlate against TCP flow destinations in outage reports\.
+**Timeline sketch:**
+t+0s → route change observed (cause: unknown)
+t+0s–t+60s → silent interval (convergence, transient loss, or session degradation occurring)
+t+60s → TCP failures reported as outage
 
-3\. \*\*Path reachability\*\*: Run traceroute or path\-probe diagnostics to the failed TCP endpoints from device\-1, checking for reachability and hop consistency before and after the route change\.
+**Open questions:**
+- Which specific prefix(es) changed, and what were the old vs. new next-hops?
+- Was device-1 the originator or follower of this route change?
+- Did the route change to an invalid/unreachable next-hop, or to a slower/lossy one?
+- Were any upstream topology events logged?
 
-4\. \*\*BGP/IGP logs\*\*: Review routing protocol event logs \(if available as read\-only records\) for neighbor state, prefix announcements/withdrawals, or policy changes coinciding with T\+0s\.
-
-5\. \*\*Device health\*\*: Confirm CPU, memory, and control\-plane stability on device\-1 during the interval to rule out processor constraints affecting both routing and TCP stack\.
-
-\#\# Post\-mortem notes
-
-\*\*Timeline sketch:\*\*
-\- T\+0s: Route change alert\.
-\- T\+60s: TCP failure alert with reported outage\.
-
-\*\*Open questions:\*\*
-\- What specific routes changed, and did they match the affected TCP destinations?
-\- Was the route change intentional \(admin\-driven, policy convergence\) or anomalous?
-\- Did the outage scope match the changed route footprint?
-\- Were other devices or paths available as fallbacks?
-
-The evidence is too thin to confirm causation\. Root cause remains unconfirmed pending route\-table analysis and path validation\.
-
-Human approval is required before escalation or remediation\.
+Human approval is required before proceeding.
+```
 
 ## INC-a6d424b09916 — SEV1
 

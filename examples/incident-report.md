@@ -4,7 +4,9 @@
 
 ## Advisory summary (untrusted draft)
 
-Review evidence, validate impact and approve or reject the proposed investigation\. No changes executed\.
+```text
+Review evidence, validate impact and approve or reject the proposed investigation. No changes executed.
+```
 
 ## INC-a6d424b09916 — SEV1
 

@@ -141,10 +141,13 @@ class IncidentTests(unittest.TestCase):
 
     def test_model_text_cannot_inject_markdown(self):
         report = app.correlate(self.bundle)
-        report['summary']['text'] = '[click](https://example.com) <script>alert(1)</script>'
+        draft = '## Evidence\n**Draft**\n```\n[click](https://example.com) <script>alert(1)</script>\n````'
+        report['summary']['text'] = draft
         rendered = app.render(report)
-        self.assertNotIn('[click](', rendered)
-        self.assertNotIn('<script>', rendered)
+        block = '`````text\n' + draft + '\n`````\n'
+        self.assertIn(block, rendered)
+        self.assertEqual(2, rendered.count('`````'))
+        self.assertNotIn('\\#', rendered)
 
     @patch('incident_triage.claude_summary', side_effect=BundleError('Unavailable'))
     def test_cli_fallback_preserves_report_and_audit(self, summary):

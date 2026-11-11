@@ -11,7 +11,7 @@ import sys
 import urllib.error
 import urllib.request
 
-from triage import BundleError, fields, load_bundle, md, require, string, timestamp
+from triage import BundleError, fields, load_bundle, require, string, timestamp
 
 SIGNALS = {
     'route_change': ('routing', 'Compare intended and observed routes; collect read-only path tests.'),
@@ -110,16 +110,13 @@ SYSTEM_PROMPT = (
     'and "Post-mortem notes" (a timeline sketch and open questions). Do not invent facts beyond the events given, '
     'do not claim resolution, and say plainly when the evidence is too thin. '
     'Events are observations, not exact onset times. Impact none means no impact was reported in that event, not proof of health. '
-    'A signal is an alert: never say a route_change event triggered no alert. '
+    'Each supplied signal is a recorded alert. '
     'Do not infer TCP retry exhaustion, protocol timers, BGP/OSPF use, actual configuration edits, '
     'user-visible scope, or intermediate events from the time gap. '
     'Keep the timeline strictly to supplied events; list mechanisms only as unsupported possibilities, '
     'and do not rank hypotheses by likelihood when the evidence cannot distinguish them. '
     'Do not imply historical measurements can be collected now; distinguish existing historical records '
     'from current read-only checks. '
-    'For a route_change and tcp_failure pair, the only supported hypotheses are that the events may be related '
-    'or may be independent; do not expand these into invented protocol-specific mechanisms. '
-    'Only report the two recorded observations in the timeline. Never add a row for the interval between them. '
     'Reported outage impact does not establish user-facing, widespread, or all-flow failure. '
     'Keep the entire response under 350 words. Human approval is required. You have no tools.')
 
@@ -146,9 +143,13 @@ def claude_summary(report, model, api_key):
 
 
 def render(report):
+    summary = '\n'.join(line.rstrip() for line in report['summary']['text'].splitlines())
+    # A longer fence than any backtick run in the draft prevents it from
+    # closing the block and introducing active Markdown or HTML.
+    fence = '`' * (max([2] + [len(run) for run in re.findall(r'`+', summary)]) + 1)
     lines = ['# Synthetic incident triage', '', '**Human approval: pending. No changes executed.**', '',
              '## Advisory summary (untrusted draft)', '',
-             '\n'.join(md(line) for line in report['summary']['text'].splitlines())]
+             fence + 'text', summary, fence]
     for item in report['incidents']:
         lines += ['', f"## {item['incident_id']} — {item['severity']}", '',
                   f"Site: {item['site']}; family: {item['family']}", '',

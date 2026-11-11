@@ -119,7 +119,7 @@ logs are not accepted at all. This data minimization avoids relying on regex
 redaction of arbitrary logs. The prompt asks for four sections per incident
 (what the evidence shows, ranked unconfirmed hypotheses, read-only checks, and
 post-mortem notes) and forbids changing severity or claiming resolution.
-There are no model tools. Responses are bounded, escaped in Markdown and labeled
+There are no model tools. Responses are bounded, displayed in a plain-text code block and labeled
 as an untrusted draft; humans must check them for unsupported claims.
 
 Without `--claude`, no API call occurs even if a key is set. Missing configuration,
